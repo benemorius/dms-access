@@ -1,0 +1,23 @@
+#!/usr/bin/env python2
+
+import piplates.RELAYplate as RELAY
+import argparse
+from time import sleep
+
+def main():
+    parser = argparse.ArgumentParser(description='Opens doors with relays')
+    parser.add_argument('-r', '--relay', required=True, help='Which relay to activate', type=int)
+    parser.add_argument('-s', '--seconds', required=False, help='How many seconds to leave the relay active', type=float, default=5)
+    args = parser.parse_args()
+    door = args.relay
+    seconds = args.seconds
+
+    print "opening door {}".format(door)
+    RELAY.getID(0)
+    sleep(0.001) # this delay seems no longer necessary (used to be 50ms; now it's 1ms just to be safe for now)
+    RELAY.relayON(0, door)
+    sleep(seconds)
+    RELAY.relayOFF(0, door)
+    
+if __name__ == "__main__":
+    main()
