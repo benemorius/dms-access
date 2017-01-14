@@ -31,7 +31,7 @@ RPversion=1.1
 
 RMAX = 2000
 MAXADDR=8
-relaysPresent = range(8)
+relaysPresent = list(range(8))
 
 #==============================================================================#
 # HELP Functions	                                                           #
@@ -51,7 +51,7 @@ def help():
             while (Count<20):
                 s=f.readline()
                 if (len(s)!=0):
-                    print s[:len(s)-1]
+                    print (s[:len(s)-1])
                     Count = Count + 1
                     if (Count==20):
                         Input=raw_input('press \"Enter\" for more...')                        
@@ -117,7 +117,7 @@ def getID(addr):
     VerifyADDR(addr)   
     addr=addr+RELAYbaseADDR
     id=""
-    arg = range(4)
+    arg = list(range(4))
     resp = []
     arg[0]=addr;
     arg[1]=0x1;
@@ -173,7 +173,7 @@ def VerifyADDR(addr):
 
 def ppCMDr(addr,cmd,param1,param2,bytes2return):
     global RELAYbaseADDR
-    arg = range(4)
+    arg = list(range(4))
     resp = []
     arg[0]=addr+RELAYbaseADDR;
     arg[1]=cmd;
