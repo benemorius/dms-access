@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from DMSconfig import ad_string, ad_address, ad_user, ad_password, hard_pins, door_layout, common_doors, server_doors, electrical_doors, garage_doors, common_badges, server_badges, electrical_badges, garage_badges
+from DMSconfig import ad_string, ad_address, ad_user, ad_password, hard_pins, door_layout, common_doors, server_doors, electrical_doors, garage_doors, common_badges, server_badges, electrical_badges, garage_badges, blacklisted_badges
 import daemon
 import argparse
 import os
@@ -35,10 +35,32 @@ def get_badges():
     conn = Connection(server, user=ad_user, password=ad_password, authentication=NTLM)
     conn.bind()
     badge_list = []
-    conn.search("ou=Members,dc=dms,dc=local", ad_string, attributes=['employeeID'])
+    conn.extend.standard.paged_search("ou=Members,dc=dms,dc=local", ad_string, attributes=['employeeID'], generator=False)
     for entry in conn.entries:
-        badge_list.append(str(entry['employeeID'].value).lstrip('0'))
+        badge = str(entry['employeeID'].value).lstrip('0')
+        if badge != 'None':
+            badge_list.append(badge)
     return badge_list
+
+
+# whyyyyy is this still only twice as fast as querying for all active badges??
+# by the way, this won't function reliably until all badges are zero-stripped in ad itself
+def query_single_badge(badge):
+    badge = str(badge).lstrip('0')
+    ad_string = '(&(objectClass=person)(|(userAccountControl=512)(userAccountControl=66048))(employeeID={}))'.format(badge)
+
+    from ldap3 import Server, Connection, ALL, NTLM
+    server = Server(ad_address, get_info=ALL)
+    conn = Connection(server, user=ad_user, password=ad_password, authentication=NTLM)
+    conn.bind()
+    badge_list = []
+    conn.search("ou=Members,dc=dms,dc=local", ad_string, attributes=['employeeID'], paged_size=1)
+
+    return True if len(conn.entries) > 0 else False
+
+
+def queue_badge_update(badge):
+    pass # not yet implemented
 
 
 def cache_write(badge_list):
@@ -65,6 +87,8 @@ def verify_pin(door, pin):
 
 def verify_badge(door, badge):
     badge = str(badge).lstrip('0')
+
+    if badge in blacklisted_badges: return False
     
     try:
         badge_list = cache_load()
@@ -125,7 +149,7 @@ def main():
     parser.add_argument('-d', '--daemon', help='Fork and run in background', action='store_true')
     parser.add_argument('-l', '--logfile', help='Absolute path of logfile', default='/var/log/dms_daemon.log')
     parser.add_argument('-a', '--address', help='Address to listen on', default='127.0.0.1')
-    parser.add_argument('-p', '--port', help='Port to listen on', default=6666, type=int)
+    parser.add_argument('-p', '--port', help='Port to listen on', default=55555, type=int)
     args = parser.parse_args()
 
     if args.daemon:
@@ -153,6 +177,7 @@ def daemon_process(address, port):
                 open_door(RELAY, door)
             else:
                 os.system('echo {} - Badge failed for door {} {} >> {}'.format(stamp(), door, str(badge).lstrip('0'), log_path))
+                queue_badge_update(badge)
 
         elif 'pin' in message:
             pin = message['pin']
