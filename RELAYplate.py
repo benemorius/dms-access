@@ -173,15 +173,15 @@ def VerifyADDR(addr):
 
 def ppCMDr(addr,cmd,param1,param2,bytes2return):
     global RELAYbaseADDR
-    arg = list(range(4))
+    arg = []
     resp = []
-    arg[0]=addr+RELAYbaseADDR;
-    arg[1]=cmd;
-    arg[2]=param1;
-    arg[3]=param2;
+    arg.append(addr+RELAYbaseADDR)
+    arg.append(cmd)
+    arg.append(param1)
+    arg.append(param2)
     GPIO.output(ppFRAME,True)
-    null=spi.xfer(arg,300000,60)
-    #null = spi.writebytes(arg)
+    # null=spi.xfer(arg,300000,60)
+    null = spi.writebytes(arg)
     if bytes2return>0:
         time.sleep(.0001)
         for i in range(0,bytes2return):	
