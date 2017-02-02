@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 
+import daemon
+import zmq
+
 import argparse
 import os
 import sys
@@ -7,6 +10,9 @@ from datetime import datetime
 import time
 import pickle
 from DMSconfig import ad_string, ad_address, ad_user, ad_password, hard_pins, door_layout, common_doors, server_doors, electrical_doors, garage_doors, common_badges, server_badges, electrical_badges, garage_badges
+from time import sleep
+from socket import *
+import json
 
 # Where to store the cache
 picklepath = '/root/dms_ad_pickle'
@@ -60,6 +66,8 @@ def verify_pin(door, pin):
 
 
 def verify_badge(door, badge):
+    badge = str(badge).lstrip('0')
+    
     try:
         badge_list = cache_load()
     except:
@@ -80,6 +88,7 @@ def verify_badge(door, badge):
         cache_write(badge_list)
 
     badge_list.extend(common_badges)
+    garage_badges.extend(badge_list)
 
     if door in common_doors:
         return True if badge in badge_list else False
@@ -96,12 +105,21 @@ def verify_badge(door, badge):
     return False
 
 
-def open_door(door):
-    # return
+def activate_relay(RELAY, relay, seconds):
+    print("relay {} on".format(relay))
+    RELAY.relayON(0, int(relay))
+    sleep(seconds)
+    print("relay {} off".format(relay))
+    RELAY.relayOFF(0, int(relay))
+
+
+def open_door(RELAY, door):
     door = door_layout[door]
-    command = 'DMSrelay -r %s' % (door)
-    os.system('echo %s - %s >> %s' % (stamp(), command, log_path))
-    os.system(command + ' &')
+    seconds = 5
+    # os.system('echo %s - %s >> %s' % (stamp(), "activating relay {}".format(door), log_path))
+    activate_relay(RELAY, door, seconds)
+    # os.system('echo %s - %s >> %s' % (stamp(), "deactivated relay {}".format(door), log_path))
+    return
 
 
 def main():
@@ -134,7 +152,6 @@ def main():
         pass
     
     try:
-        badge = str(args.badge[0]).lstrip('0')
         if verify_badge(door, badge):
             open_door(door)
         else:
@@ -144,5 +161,46 @@ def main():
         pass
 
 
+def daemon_process():
+    import RELAYplate as RELAY
+    
+    serverSocket = socket(AF_INET, SOCK_DGRAM)
+    serverSocket.bind(('127.0.0.1', 6666))
+
+    while True:
+        message, address = serverSocket.recvfrom(1024)
+        message = json.loads(message.decode())
+        print(type(message))
+        print(message)
+        door = message['door']
+
+        if 'badge' in message:
+            badge = message['badge']
+            if verify_badge(door, badge):
+                open_door(RELAY, door)
+            else:
+                os.system('echo {} - Badge failed for door {} {} >> {}'.format(stamp(), door, badge, log_path))
+
+
+        elif 'pin' in message:
+            pin = message['pin']
+            if verify_pin(door, pin):
+                open_door(RELAY, door)
+            else:    
+                os.system('echo {} - Pin failed for door {} {} >> {}'.format(stamp(), door, pin, log_path))
+
+
+        else:
+            print("no badge or pin in message")
+        # open_door(RELAY, '13')
+
+
+def start_daemon():
+    # out = open('/var/log/dms_daemon.log', 'a+')
+    # with daemon.DaemonContext(stdout=out, stderr=out):
+        daemon_process()
+
+
 if __name__ == "__main__":
-    main()
+    start_daemon()
+    # main()
