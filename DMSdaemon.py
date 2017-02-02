@@ -24,9 +24,10 @@ cache_age_max = 3600
 # Max door open time in seconds
 door_open_max = 60
 
+# push a badge number to queue it for updating; push None to update the whole badge cache
+badge_update_queue = Queue()
 
 relay_board_lock = threading.Semaphore()
-badge_update_queue = Queue()
 common_badge_list = []
 badge_list_lock = threading.Semaphore()
 
@@ -190,7 +191,9 @@ class CacheManager(threading.Thread):
             badge_update_queue.task_done()
 
     def _update_badge(self, badge):
-        print("{} SKIPPING single badge update for {} because badges need to be zero-stripped in AD for single badge queries to work".format(stamp(), badge))
+        # this function does work properly, except that zero-padded badges in AD cause false negatives, so bypass it for now
+        print("{} updating whole badge cache instead of single badge because badges need to be zero-stripped in AD for single badge queries to work".format(stamp()))
+        self._update_all_badges()
         return
 
         print("{} updating single badge {}".format(stamp(), badge))
